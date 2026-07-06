@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pix2Act: Image-Space Manipulation Policies with Equivariant Augmentation</title>
+<meta name="description" content="Pix2Act expresses 3D action chunks as continuous 2D image-space keypoint trajectories, enabling n-equivariant augmentation for closed-loop robot manipulation.">
+
+<!--
+  ============================================================
+  MEDIA FILES NEEDED  (drop these next to index.html)
+  ------------------------------------------------------------
+    intro.png
+    fruit_1.mp4           fruit_2.mp4
+    toast_1.mp4           toast-2.mp4
+    trajectory.png        trajectory_vis.mp4
+    flower_left_shake.mp4 flower_right_shake.mp4
+    drawer_left_shake.mp4 drawer_right_shake.mp4
+  ------------------------------------------------------------
+  Replace AUTHORS and the LINK buttons (Paper / arXiv / Code / Video)
+  below before publishing. If a video gets cropped, change
+  `object-fit: cover` to `object-fit: contain` in the .media rule.
+  ============================================================
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Caveat:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 22 C10 8 16 8 20 16 S28 22 29 9' fill='none' stroke='%231b4de0' stroke-width='2.4' stroke-linecap='round'/%3E%3Ccircle cx='3' cy='22' r='3' fill='%231b4de0'/%3E%3Ccircle cx='29' cy='9' r='3' fill='%23e08a1e'/%3E%3C/svg%3E">
+
+<style>
+  :root{
+    --paper:#F7F2EA;
+    --surface:#FFFDF8;
+    --ink:#1A140D;
+    --ink-2:#52493D;
+    --ink-3:#8A7E6E;
+    --line:#EBE2D4;
+    --line-2:#D8CCB9;
+    --accent:#1B4DE0;
+    --accent-ink:#1239AE;
+    --accent-soft:#ECF1FE;
+    --warm:#E08A1E;
+    --font-display:'Space Grotesk', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-serif:'Newsreader', Georgia, 'Times New Roman', serif;
+    --font-mono:'JetBrains Mono', ui-monospace, monospace;
+    --wrap:1060px;
+    --prose:1060px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-size:17px;
+    line-height:1.72;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  a{color:var(--accent);text-decoration:none;}
+  a:hover{color:var(--accent-ink);}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px;}
+  img,video{max-width:100%;}
+
+  .wrap{max-width:var(--wrap);margin-inline:auto;padding-inline:24px;}
+  .prose{max-width:var(--prose);margin-inline:auto;padding-inline:24px;}
+  section[id]{scroll-margin-top:76px;}
+
+  /* ---------- nav ---------- */
+  .nav{position:sticky;top:0;z-index:50;transition:background .25s ease, border-color .25s ease;
+       border-bottom:1px solid transparent;}
+  .nav.scrolled{background:rgba(247,242,234,.85);backdrop-filter:saturate(160%) blur(10px);border-bottom-color:var(--line);}
+  .nav__in{display:flex;align-items:center;justify-content:space-between;height:60px;}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-display);font-weight:600;
+         font-size:1.05rem;letter-spacing:-.01em;color:var(--ink);}
+  .brand:hover{color:var(--ink);}
+  .brand svg{display:block;}
+  .nav__links{display:flex;gap:26px;}
+  .nav__links a{font-family:var(--font-mono);font-size:.78rem;letter-spacing:.02em;color:var(--ink-2);}
+  .nav__links a:hover{color:var(--accent);}
+  @media(max-width:620px){.nav__links{display:none;}}
+
+  /* ---------- hero ---------- */
+  .hero{padding:74px 0 18px;text-align:center;}
+  .kicker{font-family:var(--font-mono);font-size:.76rem;letter-spacing:.22em;text-transform:uppercase;
+          color:var(--ink-3);margin-bottom:22px;}
+  .hero h1{font-family:'Times New Roman',Times,serif;font-weight:700;letter-spacing:-.01em;
+           line-height:1;font-size:clamp(3.2rem,9.5vw,5.8rem);margin:0;color:var(--accent);}
+  .hero .sub{font-family:var(--font-display);font-weight:500;letter-spacing:-.01em;line-height:1.24;
+             font-size:clamp(1.12rem,2.7vw,1.6rem);color:var(--ink-2);max-width:760px;
+             margin:18px auto 0;}
+  .authors{margin:30px auto 4px;max-width:880px;font-size:1.02rem;color:var(--ink);}
+  .authors a{color:var(--ink);transition:color .15s ease;}
+  .authors a:hover{color:var(--accent);}
+  .authors sup{color:var(--accent);font-weight:600;font-size:.72em;}
+  .affil{font-family:var(--font-mono);font-size:.8rem;color:var(--ink-3);margin-bottom:6px;}
+
+  .links{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:26px;}
+  .btn{display:inline-flex;align-items:center;gap:.55em;font-family:var(--font-mono);font-size:.82rem;
+       letter-spacing:.01em;padding:.62em 1.15em;border-radius:999px;border:1px solid var(--line-2);
+       background:var(--surface);color:var(--ink);transition:all .18s ease;}
+  .btn svg{width:15px;height:15px;}
+  .btn:hover{border-color:var(--ink);color:var(--ink);transform:translateY(-1px);}
+  .btn--primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn--primary:hover{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff;}
+
+  .flourish{margin:34px auto 0;display:block;}
+  .traj-line{stroke:var(--accent);stroke-width:2.4;fill:none;stroke-linecap:round;
+             stroke-dasharray:320;stroke-dashoffset:320;animation:draw 1.5s .25s ease-out forwards;}
+  .traj-dot{opacity:0;transform-box:fill-box;transform-origin:center;animation:pop .45s ease-out forwards;}
+  .traj-dot.d1{animation-delay:.35s;} .traj-dot.d2{animation-delay:.95s;} .traj-dot.d3{animation-delay:1.5s;}
+  @keyframes draw{to{stroke-dashoffset:0;}}
+  @keyframes pop{from{opacity:0;transform:scale(.2);}to{opacity:1;transform:scale(1);}}
+
+  /* ---------- sections ---------- */
+  .sec{padding-block:clamp(3.4rem,6.5vw,5.6rem);}
+  .sec--line{border-top:1px solid var(--line);}
+  .sec--alt{background:var(--surface);}
+  .eyebrow{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;
+           color:var(--accent);display:flex;align-items:center;gap:.7rem;margin:0 0 1rem;}
+  .eyebrow::before{content:"";width:22px;height:1.5px;background:var(--accent);}
+  h2{font-family:var(--font-display);font-weight:600;letter-spacing:-.015em;line-height:1.08;
+     font-size:clamp(1.55rem,3.3vw,2.15rem);margin:0 0 1.2rem;}
+  .lead{font-family:var(--font-serif);font-size:1.18rem;color:var(--ink-2);max-width:var(--prose);margin:0;}
+  p{margin:0 0 1.1rem;}
+  p:last-child{margin-bottom:0;}
+
+  /* reading prose — warm, book-like serif (only unclassed body paragraphs) */
+  p:not([class]){
+    font-family:var(--font-serif);
+    font-size:1.2rem;
+    line-height:1.78;
+    color:var(--ink-2);
+    letter-spacing:.002em;
+  }
+  #abstract p:not([class]){color:var(--ink);font-size:1.24rem;}
+
+  /* colored highlights — highlighter-pen underline for key terms */
+  p strong, .card strong{
+    font-weight:600;color:var(--accent-ink);
+    background:linear-gradient(transparent 62%, var(--accent-soft) 62%);
+    padding:0 .06em;border-radius:2px;
+  }
+  p strong.warm, .card strong.warm{
+    color:#9c5b06;background:linear-gradient(transparent 62%, #FBEAD2 62%);
+  }
+  p strong.red, .card strong.red{
+    color:#b42318;background:linear-gradient(transparent 62%, #FBE0DD 62%);
+  }
+
+  /* ---------- figure / media ---------- */
+  figure{margin:0;}
+  .media{position:relative;min-height:210px;display:flex;align-items:center;justify-content:center;
+         background:linear-gradient(180deg,#fffdf8,#f3ece0);border:1px solid var(--line);
+         border-radius:14px;overflow:hidden;
+         transition:box-shadow .28s ease, transform .28s ease, border-color .28s ease;}
+  .media:hover{box-shadow:0 16px 36px -18px rgba(13,17,23,.32);border-color:var(--line-2);
+               transform:translateY(-2px);}
+  .media .ph{position:absolute;font-family:var(--font-mono);font-size:.74rem;color:var(--ink-3);
+             letter-spacing:.02em;padding:.4em .8em;border:1px dashed var(--line-2);border-radius:8px;
+             background:rgba(255,255,255,.6);}
+  .media video, .media img{position:relative;z-index:1;display:block;width:100%;height:auto;
+                           object-fit:cover;}
+  .cap{font-family:var(--font-body);font-size:.86rem;line-height:1.6;color:var(--ink-3);
+       margin-top:.95rem;max-width:880px;}
+  .cap b{font-family:var(--font-mono);font-weight:500;font-size:.78rem;color:var(--accent);
+         letter-spacing:.02em;}
+
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr;}}
+
+  .task{font-family:var(--font-mono);font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;
+        color:var(--ink-2);display:flex;align-items:center;gap:.6rem;margin:0 0 .85rem;}
+  .task::before{content:"";width:9px;height:9px;border-radius:2px;background:var(--accent);}
+  .group{margin-top:2.4rem;}
+  .group:first-of-type{margin-top:0;}
+
+  /* ---------- key ideas ---------- */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  @media(max-width:740px){.cards{grid-template-columns:1fr;}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:30px;}
+  .card h3{font-family:var(--font-display);font-weight:600;font-size:1.18rem;letter-spacing:-.01em;
+           line-height:1.25;margin:0 0 .7rem;}
+  .card p{font-size:.97rem;color:var(--ink-2);margin:0;}
+
+  /* ---------- whiteboard with pinned hand-drawn tags ---------- */
+  #idea{background:#ECE3D5;}              /* warm wall behind the board */
+  .board{
+    position:relative;
+    background:#FFFDF8;
+    background-image:
+      linear-gradient(rgba(176,138,72,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(176,138,72,.07) 1px, transparent 1px);
+    background-size:30px 30px;
+    border:1px solid #D8CCB9;
+    border-radius:16px;
+    padding:clamp(40px,5vw,64px) clamp(22px,4vw,52px) clamp(44px,5vw,58px);
+    box-shadow:inset 0 1px 0 #fff, inset 0 0 0 6px #fff, 0 24px 50px -28px rgba(13,17,23,.5);
+  }
+  .board::after{                          /* marker tray at the bottom edge */
+    content:"";position:absolute;left:8%;right:8%;bottom:-9px;height:9px;
+    background:linear-gradient(#DED2BF,#BCAD93);border-radius:0 0 8px 8px;
+    box-shadow:0 4px 8px -3px rgba(0,0,0,.4);
+  }
+  .board .cards{gap:clamp(24px,4vw,48px);}
+
+  .note{
+    position:relative;
+    background:#FFFEF7;
+    border:2.5px solid #1F2733;
+    /* irregular radii = hand-drawn rectangle */
+    border-radius:255px 12px 225px 14px/14px 225px 12px 255px;
+    padding:34px 30px 30px;
+    box-shadow:5px 7px 0 rgba(31,39,51,.10);
+    transform:rotate(-1.7deg);
+    transition:transform .25s ease, box-shadow .25s ease;
+  }
+  .note:nth-child(2){transform:rotate(1.5deg);background:#FDF6E9;}
+  .note:hover{transform:rotate(0) translateY(-3px);box-shadow:7px 11px 0 rgba(31,39,51,.12);}
+  /* punched hole for the pin */
+  .note::after{
+    content:"";position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    width:11px;height:11px;border-radius:50%;background:#EDE9DC;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.4);
+  }
+  /* pushpin head sitting over the hole */
+  .note::before{
+    content:"";position:absolute;top:6px;left:50%;transform:translateX(-50%);
+    width:20px;height:20px;border-radius:50%;z-index:2;
+    background:radial-gradient(circle at 34% 30%, #ff8b8b, #d6322f 72%);
+    box-shadow:0 4px 6px -1px rgba(0,0,0,.35), inset -2px -2px 4px rgba(0,0,0,.3),
+               inset 2px 2px 3px rgba(255,255,255,.5);
+  }
+  .note:nth-child(2)::before{
+    background:radial-gradient(circle at 34% 30%, #7da6ff, #1b4de0 72%);
+  }
+  .note h3{
+    font-family:'Caveat',cursive;font-weight:700;
+    font-size:1.95rem;line-height:1.12;letter-spacing:.005em;
+    color:var(--ink);margin:.55rem 0 .7rem;text-align:center;
+  }
+  .note p{font-size:1rem;line-height:1.7;}
+
+  /* ---------- table ---------- */
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface);}
+  table{border-collapse:collapse;width:100%;min-width:420px;}
+  th,td{padding:14px 20px;text-align:right;border-bottom:1px solid var(--line);font-size:.96rem;
+        white-space:nowrap;}
+  th:first-child,td:first-child{text-align:left;}
+  tbody tr:last-child td{border-bottom:none;}
+  thead th{font-family:var(--font-mono);font-size:.72rem;font-weight:500;text-transform:uppercase;
+           letter-spacing:.07em;color:var(--ink-3);border-bottom:1px solid var(--line-2);}
+  td.num{font-variant-numeric:tabular-nums;}
+  .ours{background:var(--accent-soft);color:var(--accent-ink);font-weight:600;}
+  thead th.ours{color:var(--accent);}
+
+  /* ---------- bibtex ---------- */
+  .bib{position:relative;background:#0E1320;border-radius:14px;padding:24px 24px 22px;overflow-x:auto;}
+  .bib pre{margin:0;font-family:var(--font-mono);font-size:.84rem;line-height:1.7;color:#C7D2E8;
+           white-space:pre;}
+  .bib .k{color:#7FA7FF;} .bib .f{color:#E0A36B;} .bib .s{color:#9DD3B3;}
+  .copy{position:absolute;top:14px;right:14px;font-family:var(--font-mono);font-size:.72rem;
+        color:#9AA6BE;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+        border-radius:8px;padding:.4em .8em;cursor:pointer;transition:all .15s;}
+  .copy:hover{color:#fff;background:rgba(255,255,255,.14);}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--line);padding:36px 0 48px;text-align:center;}
+  footer .fmark{margin-bottom:14px;}
+  footer p{font-family:var(--font-mono);font-size:.74rem;color:var(--ink-3);letter-spacing:.02em;
+           line-height:1.7;margin:0;}
+
+  /* ---------- reveal ---------- */
+  .reveal{opacity:0;transform:translateY(14px);transition:opacity .65s ease, transform .65s ease;}
+  .reveal.in{opacity:1;transform:none;}
+
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;}
+    .reveal{opacity:1;transform:none;transition:none;}
+    .traj-line{animation:none;stroke-dashoffset:0;}
+    .traj-dot{animation:none;opacity:1;}
+  }
+</style>
+</head>
+<body id="top">
+
+<header class="nav">
+  <div class="nav__in wrap">
+    <a class="brand" href="#top">
+      <svg width="30" height="14" viewBox="0 0 32 16" aria-hidden="true">
+        <path d="M3 12 C9 3 15 3 19 9 S28 12 29 4" fill="none" stroke="#1B4DE0" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="3" cy="12" r="2.6" fill="#1B4DE0"/><circle cx="29" cy="4" r="2.6" fill="#E08A1E"/>
+      </svg>
+      Pix2Act
+    </a>
+    <nav class="nav__links" aria-label="Sections">
+      <a href="#abstract">Abstract</a>
+      <a href="#idea">Method</a>
+      <a href="#results">Results</a>
+      <a href="#robustness">Robustness</a>
+      <a href="#bibtex">BibTeX</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero wrap">
+    <div class="kicker">Robotic Manipulation and Learning</div>
+    <h1>Pix2Act</h1>
+    <p class="sub">Image-Space Manipulation Policies with Equivariant Augmentation</p>
+
+    <p class="authors">
+      <a href="https://haojhuang.github.io/" target="_blank" rel="noopener">Haojie Huang</a><sup>1,&ast;</sup>,
+      <a href="https://lfzhao.com/" target="_blank" rel="noopener">Linfeng Zhao</a><sup>2</sup>,
+      <a href="https://openreview.net/profile?id=~Haotian_Liu6" target="_blank" rel="noopener">Haotian Liu</a><sup>1</sup>,
+      <a href="https://openreview.net/profile?id=~Zhang_Ye1" target="_blank" rel="noopener">Zhang Ye</a><sup>1</sup>,
+      <a href="https://openreview.net/profile?id=~Si-Yuan_Huang1" target="_blank" rel="noopener">Si-Yuan Huang</a><sup>3</sup>,
+      <a href="https://openreview.net/profile?id=~Mingxi_Jia1" target="_blank" rel="noopener">Mingxi Jia</a><sup>4</sup>,
+      <a href="https://openreview.net/profile?id=~Boce_Hu1" target="_blank" rel="noopener">Boce Hu</a><sup>1</sup>,
+      <a href="https://openreview.net/profile?id=~Fangzhou_Lin1" target="_blank" rel="noopener">Fangzhou Lin</a><sup>5</sup>,
+      <a href="https://openreview.net/profile?id=~Yu_Qi4" target="_blank" rel="noopener">Yu Qi</a><sup>1</sup>,
+      <a href="https://openreview.net/profile?id=~Dian_Wang1" target="_blank" rel="noopener">Dian Wang</a><sup>2</sup>,
+      <a href="https://www.robinwalters.com/" target="_blank" rel="noopener">Robin Walters</a><sup>1,&dagger;</sup>,
+      <a href="https://www2.ccs.neu.edu/research/helpinghands/" target="_blank" rel="noopener">Robert Platt</a><sup>1,&dagger;</sup>
+    </p>
+    <p class="affil">
+      <sup>1</sup> Northeastern University &nbsp; <sup>2</sup> Stanford University &nbsp; <sup>3</sup> University of Pennsylvania &nbsp; <sup>4</sup> Brown University &nbsp; <sup>5</sup> Texas A&amp;M University<br>
+      <sup>&ast;</sup> Corresponding author &nbsp; <sup>&dagger;</sup> Equal advising
+    </p>
+
+    <!-- TODO: replace href="#" with real links -->
+    <div class="links">
+      <a class="btn btn--primary" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M5 3h9l6 6v12H5z"/><path d="M9 13h6M9 17h6"/></svg>
+        Paper
+      </a>
+      <a class="btn" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M8 9l4 6 4-6"/></svg>
+        arXiv
+      </a>
+      <a class="btn" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3-.3 6.2-1.5 6.2-6.7a5.2 5.2 0 0 0-1.5-3.6 4.9 4.9 0 0 0-.1-3.6s-1.2-.4-3.9 1.5a13.4 13.4 0 0 0-7 0C5.3 1.3 4.1 1.7 4.1 1.7a4.9 4.9 0 0 0-.1 3.6 5.2 5.2 0 0 0-1.5 3.6c0 5.2 3.2 6.4 6.2 6.7a3.4 3.4 0 0 0-.9 2.6V22"/></svg>
+        Code
+      </a>
+      <a class="btn" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z" fill="currentColor" stroke="none"/></svg>
+        Video
+      </a>
+    </div>
+
+    <svg class="flourish" width="240" height="46" viewBox="0 0 240 46" aria-hidden="true">
+      <path class="traj-line" d="M6 32 C60 8 102 8 132 26 S202 42 234 12"/>
+      <circle class="traj-dot d1" cx="6" cy="32" r="4.5" fill="#1B4DE0"/>
+      <circle class="traj-dot d2" cx="132" cy="26" r="3.5" fill="#7A8290"/>
+      <circle class="traj-dot d3" cx="234" cy="12" r="4.5" fill="#E08A1E"/>
+    </svg>
+  </section>
+
+  <!-- ABSTRACT -->
+  <section class="sec sec--line" id="abstract">
+    <div class="prose reveal">
+      <p class="eyebrow">Abstract</p>
+      <p>
+        Representing manipulation actions as 2D trajectories in the camera plane provides a compact and
+        interpretable basis for learning complex 3D manipulation policies. However, it also creates challenges
+        from out-of-frame trajectories and limited precision. We propose <strong>Pix2Act</strong>, an imitation
+        learning method that addresses these challenges by generating continuous image-space keypoint
+        trajectories in each camera plane and losslessly recovering end-effector poses via triangulation. This
+        reformulates high-dimensional 3D control as a simpler, more learnable 2D prediction problem. Crucially,
+        it aligns observations and actions in the same coordinate space, enabling equivariant transformations to
+        jointly rotate individual camera images together with their image-space actions. We analyze the symmetry
+        properties of this augmentation and design a network architecture that can fuse multiple camera views
+        while respecting their per-view rotations. As a result, Pix2Act implicitly enlarges the support of the
+        data distribution and learns invariant action structures across transformations, yielding improved
+        generalization and overall performance. Across diverse simulated and real-world manipulation tasks,
+        Pix2Act outperforms state-of-the-art baselines and remains robust under camera perturbations.
+      </p>
+    </div>
+  </section>
+
+  <!-- TEASER -->
+  <section class="wrap" style="padding-top:14px;">
+    <figure class="reveal">
+      <div class="media">
+        <span class="ph">intro.png</span>
+        <img src="intro.png" alt="Pix2Act overview: dual in-hand camera setup, predicted image-space keypoint trajectories, and triangulation to 3D.">
+      </div>
+      <figcaption class="cap" style="max-width:none;text-align:justify;">
+        <b>Figure 1.</b> From left to right: (a) an illustration of our dual in-hand camera setup and the
+        selected keypoints; (b, c) our proposed method consumes stereo images and predicts image actions for
+        these keypoints, where independent image rotations result in consistent transformations of the 2D action
+        trajectories; (d) triangulation yields consistent 3D results for both the original and transformed image
+        pairs, as they convey the same contextual information.
+      </figcaption>
+    </figure>
+  </section>
+
+  <!-- KEY IDEAS -->
+  <section class="sec sec--line sec--alt" id="idea">
+    <div class="wrap">
+      <div class="reveal" style="max-width:var(--prose);">
+        <p class="eyebrow">Key Ideas</p>
+        <h2>Ideas behind Pix2Act</h2>
+      </div>
+      <div class="board reveal" style="margin-top:1.8rem;">
+       <div class="cards">
+        <div class="card note">
+          <h3>n-Equivariance via image-space actions</h3>
+          <p>
+            Overfitting is a well-known <strong class="red">headache</strong> in robot learning, and data augmentation helps. Invariant
+            augmentation perturbs observations while keeping actions fixed, which only improves robustness.
+            Equivariant augmentation transforms both observations and actions, but it needs the two in a shared
+            space, and a dimensional gap separates 2D RGB observations from 3D actions over time. Pix2Act closes
+            this gap by expressing 3D action chunks as continuous, unbounded 2D image coordinates relative to a
+            pair of in-hand cameras. With actions and observations in the same space, rotating an image rotates
+            its predicted trajectory by the same amount. We call this <strong>n-equivariance</strong>.
+          </p>
+        </div>
+        <div class="card note">
+          <h3>Plug-and-play dual in-hand cameras</h3>
+          <p>
+            Our system uses an easy-to-plug dual in-hand camera design (Figure 1) with three advantages. First,
+            the close proximity of the cameras to the end-effector lets our model see the manipulated objects with
+            <strong>high acuity</strong>, giving clearer patterns of how the end-effector tips interact with the
+            target object. Second, this configuration is <strong class="warm">readily deployable</strong> and
+            easily integrated with different robotic arms. Finally, projecting the action chunk onto the in-hand
+            views naturally canonicalizes the action in the end-effector frame, so the representation becomes
+            inherently <strong>SE(3)-invariant</strong>, substantially improving policy generalization.
+          </p>
+        </div>
+       </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="sec sec--line" id="results">
+    <div class="wrap">
+      <div class="reveal" style="max-width:var(--prose);">
+        <p class="eyebrow">Real-World Experiments</p>
+        <h2>Real-world manipulation</h2>
+        <p class="lead">Pix2Act runs closed-loop on a real robot across long-horizon, contact-rich tasks.</p>
+      </div>
+
+      <div class="group reveal">
+        <p class="task">Prepare Fruit Plate &middot; 1&times; speed</p>
+        <div class="grid2">
+          <figure><div class="media"><span class="ph">fruit_1.mp4</span>
+            <video src="fruit_1.mp4" autoplay loop muted playsinline controls></video></div></figure>
+          <figure><div class="media"><span class="ph">fruit_2.mp4</span>
+            <video src="fruit_2.mp4" autoplay loop muted playsinline controls></video></div></figure>
+        </div>
+      </div>
+
+      <div class="group reveal">
+        <p class="task">Make Toast &middot; 1&times; speed</p>
+        <div class="grid2">
+          <figure><div class="media"><span class="ph">toast_1.mp4</span>
+            <video src="toast_1.mp4" autoplay loop muted playsinline controls></video></div></figure>
+          <figure><div class="media"><span class="ph">toast-2.mp4</span>
+            <video src="toast-2.mp4" autoplay loop muted playsinline controls></video></div></figure>
+        </div>
+      </div>
+
+      <div class="group reveal">
+        <p class="task">Predicted Trajectories</p>
+        <figure>
+          <div class="grid2">
+            <div class="media"><span class="ph">trajectory_vis.mp4</span>
+              <video src="trajectory_vis.mp4" autoplay loop muted playsinline controls></video></div>
+            <div class="media"><span class="ph">trajectory.png</span>
+              <img src="trajectory.png" alt="Predicted image-space keypoint trajectories overlaid on in-hand camera views."></div>
+          </div>
+          <figcaption class="cap" style="max-width:none;text-align:justify;">
+            <b>Predicted trajectory visualization.</b> Predicted image-space keypoint trajectories overlaid on
+            the top and bottom in-hand camera views for two real-world tasks. Trajectories remain consistent
+            across the two views.
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROBUSTNESS -->
+  <section class="sec sec--line sec--alt" id="robustness">
+    <div class="wrap">
+      <div class="reveal" style="max-width:var(--prose);text-align:center;">
+        <p class="eyebrow" style="justify-content:center;">Robustness</p>
+        <h2>Robustness to camera perturbations</h2>
+        <p style="text-align:justify;">
+          We evaluate robustness to camera perturbations on the <strong>Plug Flower</strong> and
+          <strong>Put in Drawer</strong> tasks by randomly rotating the agent-view camera at test time. This
+          differs from the agent-view ablation: rather than removing the view, we keep it but introduce
+          out-of-distribution viewpoint shifts. Pix2Act remains unaffected, while Diffusion Policy fails to
+          complete the tasks.
+        </p>
+      </div>
+
+      <div class="group reveal">
+        <p class="task">Plug Flower &middot; rotated agent view &middot; 1&times; speed</p>
+        <div class="grid2">
+          <figure><div class="media"><span class="ph">flower_left_shake.mp4</span>
+            <video src="flower_left_shake.mp4" autoplay loop muted playsinline controls></video></div></figure>
+          <figure><div class="media"><span class="ph">flower_right_shake.mp4</span>
+            <video src="flower_right_shake.mp4" autoplay loop muted playsinline controls></video></div></figure>
+        </div>
+      </div>
+
+      <div class="group reveal">
+        <p class="task">Put in Drawer &middot; rotated agent view &middot; 1&times; speed</p>
+        <div class="grid2">
+          <figure><div class="media"><span class="ph">drawer_left_shake.mp4</span>
+            <video src="drawer_left_shake.mp4" autoplay loop muted playsinline controls></video></div></figure>
+          <figure><div class="media"><span class="ph">drawer_right_shake.mp4</span>
+            <video src="drawer_right_shake.mp4" autoplay loop muted playsinline controls></video></div></figure>
+        </div>
+      </div>
+
+      <!-- success-rate table -->
+      <div class="group reveal" style="text-align:center;">
+        <p class="task" style="justify-content:center;">Success Rates</p>
+        <figure style="margin:0 auto;max-width:680px;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Task</th><th># Demo</th><th class="ours">Pix2Act</th><th>DP</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Plug Flower</td><td class="num">30</td><td class="num ours">80</td><td class="num">55</td></tr>
+                <tr><td>Put in Drawer</td><td class="num">60</td><td class="num ours">90</td><td class="num">50</td></tr>
+                <tr><td>Prepare Fruit Plate</td><td class="num">70</td><td class="num ours">85</td><td class="num">60</td></tr>
+                <tr><td>Make Toast</td><td class="num">100</td><td class="num ours">85</td><td class="num">60</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <figcaption class="cap" style="margin-inline:auto;text-align:left;">
+            <b>Real-world success rate (%).</b> Higher is better. Best result per task highlighted. DP denotes
+            Diffusion Policy.
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- BIBTEX -->
+  <section class="sec sec--line" id="bibtex">
+    <div class="prose reveal">
+      <p class="eyebrow">BibTeX</p>
+      <div class="bib">
+        <button class="copy" onclick="copyBibtex(this)">Copy</button>
+<pre id="bib"><span class="k">@article</span>{<span class="f">huang2026pix2act</span>,
+  title   = {<span class="s">Pix2Act: Image-Space Manipulation Policies with Equivariant Augmentation</span>},
+  author  = {<span class="s">Huang, Haojie and Zhao, Linfeng and Liu, Haotian and Zhang, Ye and Huang, Si-Yuan and Jia, Mingxi and Hu, Boce and Lin, Fangzhou and Qi, Yu and Wang, Dian and Walters, Robin and Platt, Robert</span>},
+  journal = {<span class="s">arXiv preprint</span>},
+  year    = {<span class="s">2026</span>},
+}</pre>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <svg class="fmark" width="36" height="16" viewBox="0 0 36 16" aria-hidden="true">
+    <path d="M4 12 C11 3 18 3 22 9 S32 12 33 4" fill="none" stroke="#1B4DE0" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="4" cy="12" r="2.8" fill="#1B4DE0"/><circle cx="33" cy="4" r="2.8" fill="#E08A1E"/>
+  </svg>
+</footer>
+
+<script>
+  // bibtex copy
+  function copyBibtex(btn){
+    var t = document.getElementById('bib').innerText;
+    navigator.clipboard.writeText(t).then(function(){
+      btn.textContent = 'Copied';
+      setTimeout(function(){ btn.textContent = 'Copy'; }, 1600);
+    });
+  }
+
+  // sticky nav background on scroll
+  var nav = document.querySelector('.nav');
+  function onScroll(){ nav.classList.toggle('scrolled', window.scrollY > 8); }
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive:true });
+
+  // scroll reveal
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold:0.12, rootMargin:'0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+</script>
+</body>
+</html>
