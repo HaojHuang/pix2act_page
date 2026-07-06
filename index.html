@@ -246,6 +246,58 @@
   }
   .note p{font-size:1rem;line-height:1.7;}
 
+  /* ---------- motivation whiteboard (pinned, handwritten) ---------- */
+  .whiteboard{
+    position:relative;
+    background:#FFFFFF;
+    background-image:
+      linear-gradient(rgba(90,110,150,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(90,110,150,.05) 1px, transparent 1px);
+    background-size:26px 26px;
+    border:1px solid #D8CCB9;
+    border-radius:14px;
+    padding:clamp(40px,5vw,60px) clamp(26px,4.5vw,64px) clamp(42px,5vw,58px);
+    box-shadow:inset 0 0 0 3px #fff, 0 22px 48px -26px rgba(13,17,23,.45);
+    transform:rotate(-.35deg);
+  }
+  .whiteboard::after{                       /* marker tray at the bottom edge */
+    content:"";position:absolute;left:6%;right:6%;bottom:-10px;height:10px;
+    background:linear-gradient(#E7DECC,#C6B79C);border-radius:0 0 9px 9px;
+    box-shadow:0 5px 10px -3px rgba(0,0,0,.4);
+  }
+  .wb-pin{                                   /* pushpins in the top corners */
+    position:absolute;top:-10px;width:22px;height:22px;border-radius:50%;z-index:3;
+    background:radial-gradient(circle at 34% 30%, #ff8b8b, #d6322f 72%);
+    box-shadow:0 5px 7px -1px rgba(0,0,0,.35), inset -2px -2px 4px rgba(0,0,0,.3),
+               inset 2px 2px 3px rgba(255,255,255,.5);
+  }
+  .wb-pin--l{left:34px;transform:rotate(-8deg);}
+  .wb-pin--r{right:34px;background:radial-gradient(circle at 34% 30%, #7da6ff, #1b4de0 72%);transform:rotate(7deg);}
+  .wb-eyebrow{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;
+              color:var(--ink-3);text-align:center;margin:0 0 .2rem;}
+  .wb-title{font-family:'Caveat',cursive;font-weight:700;text-align:center;
+            font-size:clamp(2.3rem,5.4vw,3.2rem);color:var(--accent);line-height:1;margin:.1rem 0 1.5rem;}
+  .wb-cols{display:grid;grid-template-columns:1fr 1fr;gap:clamp(28px,4.5vw,54px);}
+  @media(max-width:760px){.wb-cols{grid-template-columns:1fr;gap:34px;}}
+  .wb-block h3{
+    font-family:'Caveat',cursive;font-weight:700;font-size:1.85rem;line-height:1.15;
+    color:var(--ink);margin:0 0 .55rem;display:flex;align-items:center;gap:.55rem;
+  }
+  .wb-num{
+    display:inline-flex;align-items:center;justify-content:center;flex:none;
+    width:1.85rem;height:1.85rem;border:2.5px solid var(--accent);border-radius:50%;
+    font-family:'Caveat',cursive;font-weight:700;font-size:1.3rem;color:var(--accent);
+    transform:rotate(-4deg);
+  }
+  .wb-block p{font-family:'Caveat',cursive;font-weight:500;font-size:1.4rem;line-height:1.5;
+              color:#2A2318;margin:0;}
+  .wb-block p em{font-style:italic;color:var(--ink-3);}
+  /* colored handwritten emphasis */
+  .hl-b{color:var(--accent);font-weight:700;}
+  .hl-o{color:var(--warm);font-weight:700;}
+  .hl-mark{background:linear-gradient(transparent 58%, rgba(224,138,30,.34) 58%);padding:0 .08em;}
+  .hl-mark-b{background:linear-gradient(transparent 58%, rgba(27,77,224,.20) 58%);padding:0 .08em;}
+
   /* ---------- table ---------- */
   .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface);}
   table{border-collapse:collapse;width:100%;min-width:420px;}
@@ -361,6 +413,42 @@
       <circle class="traj-dot d2" cx="132" cy="26" r="3.5" fill="#7A8290"/>
       <circle class="traj-dot d3" cx="234" cy="12" r="4.5" fill="#E08A1E"/>
     </svg>
+  </section>
+
+  <!-- MOTIVATION WHITEBOARD (pinned above the abstract) -->
+  <section class="wrap" style="padding-top:36px;">
+    <div class="whiteboard reveal">
+      <span class="wb-pin wb-pin--l" aria-hidden="true"></span>
+      <span class="wb-pin wb-pin--r" aria-hidden="true"></span>
+      <p class="wb-eyebrow">Motivation</p>
+      <p class="wb-title">Why Pix2Act?</p>
+      <div class="wb-cols">
+        <div class="wb-block">
+          <h3><span class="wb-num">1</span> A natural action representation</h3>
+          <p>
+            Humans don't represent action with translation and rotation — we can't move our hand
+            by commanding <em>"forward 2&nbsp;cm, rotate 15&deg; about the z-axis."</em> So how do we
+            represent the concept of action? The <span class="hl-b">trajectories of keypoints</span> are a
+            natural answer. And a subtler fact: our eyes never directly perceive the <span class="hl-o">3D</span>
+            trajectory of the hand — we learn this action representation with <span class="hl-mark">two eyes</span>
+            by interacting with the physical world. Pix2Act explores a new action representation for robot learning: continuous keypoint trajectories in
+            <span class="hl-mark-b">image space</span>.
+          </p>
+        </div>
+        <div class="wb-block">
+          <h3><span class="wb-num">2</span> Data augmentation for robots</h3>
+          <p>
+            Data augmentation is a cornerstone of deep learning. In vision, random crops, rotations, and
+            color jittering greatly improve <span class="hl-b">robustness</span> and
+            <span class="hl-b">generalization</span> to unseen distributions; LLMs likewise reshape sequences
+            to sharpen understanding. But it's hard to apply to robot data — observations usually live in
+            <span class="hl-o">2D</span> while actions are defined in <span class="hl-o">3D</span>, leaving a
+            <span class="hl-mark">domain gap</span>. In this work, we unlock data augmentation for robot
+            learning together with our new action representation.
+          </p>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ABSTRACT -->
